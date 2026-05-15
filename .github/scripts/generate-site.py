@@ -170,10 +170,13 @@ def render_card(p: dict) -> str:
     slug = p['slug']
     cat = html_lib.escape(p['category'])
     tags_json = html_lib.escape(json.dumps(p['tags']))
+    all_concept_tags = list(p['tags'])
     concept_chips = ''.join(
         f'<span class="ctag">{html_lib.escape(t)}</span>'
-        for t in p['tags']
-    )[:200]
+        for t in all_concept_tags[:8]
+    )
+    if len(all_concept_tags) > 8:
+        concept_chips += f'<span class="ctag ctag-more">+{len(all_concept_tags) - 8}</span>'
     return f'''    <div class="project-card" data-id="{slug}" data-category="{cat}" data-tags="{tags_json}" onclick="togglePanel(this,'{slug}')">
       <div class="card-head">
         <div class="card-info">
@@ -220,12 +223,16 @@ def render_page(repo_title: str, repo_desc: str, active_nav: str, projects: list
 
     tag_counts = Counter(t for p in projects for t in p['tags'])
     all_tags = sorted(tag_counts, key=lambda t: (-tag_counts[t], t))
-    tag_bar_chips = ''.join(
-        f'<span class="tag-chip" onclick="toggleTag(this,{json.dumps(t)})">'
-        f'{html_lib.escape(t)} <span class="tc-n">{tag_counts[t]}</span></span>'
-        for t in all_tags
-    )
-    tag_bar = f'  <div class="tag-bar">{tag_bar_chips}</div>' if all_tags else ''
+
+    def _chip(t, cls=''):
+        return (f'<span class="tag-chip{cls}" onclick="toggleTag(this,{html_lib.escape(json.dumps(t))})">'
+                f'{html_lib.escape(t)} <span class="tc-n">{tag_counts[t]}</span></span>')
+
+    concept_bar = ''.join(_chip(t) for t in all_tags)
+    tag_bar = (f'  <div class="tag-bar" id="tag-bar">'
+               f'{concept_bar}'
+               f'<span class="tag-clear" id="tag-clear" onclick="clearTags()">✕ clear</span>'
+               f'</div>') if all_tags else ''
 
     cards = '\n'.join(render_card(p) for p in projects)
     projects_json = build_projects_json(projects)
@@ -271,13 +278,17 @@ def render_page(repo_title: str, repo_desc: str, active_nav: str, projects: list
   .tab.active{{color:var(--text-1);background:var(--surface-hi)}}
   .tab-count{{font-size:10px;color:var(--text-4);margin-left:3px}}
   .tab.active .tab-count{{color:var(--text-3)}}
-  .filter-stat{{font-size:11px;color:var(--text-3);display:flex;align-items:center;gap:6px}}
-  .fstat-dot{{width:6px;height:6px;border-radius:50%;background:var(--green)}}
-  .tag-bar{{display:flex;flex-wrap:wrap;gap:5px;padding:12px 0 16px;border-bottom:1px solid var(--border);margin-bottom:20px}}
-  .tag-chip{{font-size:11px;font-weight:500;padding:3px 9px;border-radius:999px;border:1px solid var(--border-hi);color:var(--text-3);cursor:pointer;transition:all .12s;user-select:none;display:inline-flex;align-items:center;gap:4px}}
-  .tag-chip:hover{{border-color:var(--green-bd);color:var(--text-2)}}
+  .filter-stat{{font-size:11px;color:var(--text-3)}}
+  .tag-bar{{display:flex;flex-wrap:wrap;gap:5px;padding:14px 0 18px;border-bottom:1px solid var(--border);margin-bottom:22px;align-items:center}}
+  .tag-chip{{font-size:11px;font-weight:500;padding:4px 10px;border-radius:5px;border:1px solid var(--border-hi);color:var(--text-3);cursor:pointer;transition:all .12s;user-select:none;display:inline-flex;align-items:center;gap:5px}}
+  .tag-chip:hover{{border-color:var(--text-4);color:var(--text-2);background:var(--surface)}}
   .tag-chip.on{{border-color:var(--green);color:var(--green);background:var(--green-dim)}}
-  .tc-n{{font-size:10px;opacity:.6}}
+  .tc-n{{font-size:10px;opacity:.55}}
+  .tag-chip.on .tc-n{{opacity:.8}}
+  .tag-clear{{margin-left:auto;font-size:11px;font-weight:500;color:var(--text-4);cursor:pointer;padding:4px 10px;border-radius:5px;border:1px solid var(--border);transition:all .12s;display:none;align-items:center;gap:4px;flex-shrink:0}}
+  .tag-clear:hover{{color:var(--text-2);border-color:var(--border-hi)}}
+  .tag-clear.vis{{display:inline-flex}}
+  .ctag-more{{font-size:10px;color:var(--text-4);background:none;border-color:transparent}}
   .projects{{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden}}
   .project-card{{background:var(--bg);padding:20px 22px 16px;cursor:pointer;transition:background .1s;user-select:none}}
   .project-card:hover{{background:var(--surface)}}
@@ -331,7 +342,7 @@ def render_page(repo_title: str, repo_desc: str, active_nav: str, projects: list
       {tab_all}
       {tab_cats}
     </div>
-    <div class="filter-stat"><span class="fstat-dot"></span>Flutter · Dart</div>
+    <div class="filter-stat" id="showing-count">{len(projects)} projects</div>
   </div>
 {tag_bar}
   <div class="projects" id="grid">
@@ -345,12 +356,17 @@ let activeCat = 'all';
 let activePanel = null;
 
 function applyFilters() {{
+  let count = 0;
   document.querySelectorAll('.project-card').forEach(c => {{
     const tags = JSON.parse(c.dataset.tags || '[]');
     const catOk = activeCat === 'all' || c.dataset.category === activeCat;
     const tagOk = activeTags.size === 0 || [...activeTags].some(t => tags.includes(t));
-    c.classList.toggle('hidden', !(catOk && tagOk));
+    const show = catOk && tagOk;
+    c.classList.toggle('hidden', !show);
+    if (show) count++;
   }});
+  const stat = document.getElementById('showing-count');
+  if (stat) stat.textContent = count + ' projects';
 }}
 function setTab(el, cat) {{
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
@@ -359,9 +375,18 @@ function setTab(el, cat) {{
   closePanel();
   applyFilters();
 }}
+function clearTags() {{
+  activeTags.clear();
+  document.querySelectorAll('.tag-chip.on').forEach(c => c.classList.remove('on'));
+  const btn = document.getElementById('tag-clear');
+  if (btn) btn.classList.remove('vis');
+  closePanel(); applyFilters();
+}}
 function toggleTag(el, tag) {{
   if (activeTags.has(tag)) {{ activeTags.delete(tag); el.classList.remove('on'); }}
   else {{ activeTags.add(tag); el.classList.add('on'); }}
+  const btn = document.getElementById('tag-clear');
+  if (btn) btn.classList.toggle('vis', activeTags.size > 0);
   closePanel();
   applyFilters();
 }}
