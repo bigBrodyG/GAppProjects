@@ -3,6 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import { CACHE_DIR } from '../config';
 import db from '../db';
+import { authenticate } from '../middleware/authenticate';
 
 const router = Router();
 
@@ -25,7 +26,7 @@ function validateTypeCode(
   return { sanitizedCode };
 }
 
-router.get('/image/:type/:code', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/image/:type/:code', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const type = req.params.type as string;
     const code = req.params.code as string;
@@ -48,7 +49,7 @@ router.get('/image/:type/:code', async (req: Request, res: Response, next: NextF
   }
 });
 
-router.get('/meta/:type/:code', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/meta/:type/:code', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const type = req.params.type as string;
     const code = req.params.code as string;
@@ -74,7 +75,7 @@ router.get('/meta/:type/:code', async (req: Request, res: Response, next: NextFu
   }
 });
 
-router.get('/classes', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/classes', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
@@ -91,7 +92,7 @@ router.get('/classes', async (req: Request, res: Response, next: NextFunction) =
   }
 });
 
-router.get('/rooms', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/rooms', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const offset = Math.max(Number(req.query.offset) || 0, 0);

@@ -1,9 +1,10 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import db from '../db';
+import { authenticate } from '../middleware/authenticate';
 
 const router = Router();
 
-router.get('/teachers', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/teachers', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
     const offset = parseInt(req.query.offset as string) || 0;
@@ -27,7 +28,7 @@ router.get('/teachers', async (req: Request, res: Response, next: NextFunction) 
   }
 });
 
-router.get('/search', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/search', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const q = (req.query.q as string) || '';
     const role = req.query.role as string | undefined;
@@ -39,7 +40,13 @@ router.get('/search', async (req: Request, res: Response, next: NextFunction) =>
       return;
     }
 
+    if (role === 'student' && req.user!.role === 'student') {
+      res.status(403).json({ error: 'students cannot search other students' });
+      return;
+    }
+
     let query = db('users')
+      .where({ active: 1 })
       .whereNot({ role: 'admin' })
       .where(function () {
         this.where('name', 'like', `%${q}%`).orWhere('ldap_uid', 'like', `%${q}%`);
@@ -64,7 +71,7 @@ router.get('/search', async (req: Request, res: Response, next: NextFunction) =>
   }
 });
 
-router.get('/users/:id', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/users/:id', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const id = parseInt(req.params.id);
     if (isNaN(id)) {
@@ -79,6 +86,11 @@ router.get('/users/:id', async (req: Request, res: Response, next: NextFunction)
 
     if (!user) {
       res.status(404).json({ error: 'user not found' });
+      return;
+    }
+
+    if (req.user!.role === 'student' && user.role === 'student') {
+      res.status(403).json({ error: 'students cannot view other students' });
       return;
     }
 

@@ -11,6 +11,21 @@ jest.mock('../../db', () => {
 
 jest.mock('../../config', () => ({
   CACHE_DIR: '/tmp/scholtree-test-cache',
+  JWT_SECRET: 'test-secret-32-chars-minimum-length',
+  JWT_EXPIRES_IN: '1h',
+  PORT: 3000,
+  NODE_ENV: 'test',
+  DB_PATH: '/tmp/test.db',
+  UPLOAD_DIR: '/tmp',
+  NTLM_USER: '',
+  NTLM_PASS: '',
+  NTLM_DOMAIN: 'TEST',
+  LDAP_URL: 'ldap://localhost:389',
+  LDAP_BASE_DN: 'DC=test,DC=local',
+}));
+
+jest.mock('../../middleware/authenticate', () => ({
+  authenticate: (_req: any, _res: any, next: any) => next(),
 }));
 
 import express from 'express';

@@ -5,8 +5,9 @@ import { PORT } from './config';
 import healthRouter from './routes/health';
 import timetableRouter from './routes/timetable';
 import directoryRouter from './routes/directory';
-// Phase 2: import authRouter from './routes/auth';
-// Phase 2: import ldapRouter from './routes/ldap';
+import authRouter from './routes/auth';
+import ldapRouter from './routes/ldap';
+import adminRouter from './routes/admin';
 
 const app = express();
 
@@ -17,8 +18,9 @@ app.use(express.urlencoded({ extended: false }));
 app.use('/api', healthRouter);
 app.use('/api/timetable', timetableRouter);
 app.use('/api', directoryRouter);
-// Phase 2: app.use('/api/auth', authRouter);
-// Phase 2: app.use('/api/ldap', ldapRouter);
+app.use('/api/auth', authRouter);
+app.use('/api/ldap', ldapRouter);
+app.use('/api/admin', adminRouter);
 
 app.use((req: Request, res: Response) => {
   res.status(404).json({ error: 'not found' });
