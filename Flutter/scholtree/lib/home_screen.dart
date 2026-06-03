@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dati.dart';
+import 'professore_screen.dart';
 
 /// home page con navigazione a tab: home / orario / rubrica
 class HomeScreen extends StatefulWidget {
@@ -131,6 +132,14 @@ class _RubricaTab extends StatelessWidget {
             leading: const CircleAvatar(child: Icon(Icons.person)),
             title: Text(p['nome']!),
             subtitle: Text('${p['materia']} — ${p['email']}'),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ProfessoreScreen(docente: p),
+                ),
+              );
+            },
           ),
         );
       },
