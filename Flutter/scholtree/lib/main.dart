@@ -1,23 +1,28 @@
 import 'package:flutter/material.dart';
 import 'login_screen.dart';
+import 'theme.dart';
 
-/// app per la gestione dell'orario scolastico e rubrica
 void main() {
-  runApp(const MyApp());
+  runApp(
+    ValueListenableBuilder<bool>(
+      valueListenable: isDarkMode,
+      builder: (_, isDark, _) => MyApp(isDark: isDark),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool isDark;
+  const MyApp({super.key, required this.isDark});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Scholtree',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
-        useMaterial3: true,
-      ),
+      theme: lightTheme,
+      darkTheme: darkTheme,
+      themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
       home: const LoginScreen(),
     );
   }

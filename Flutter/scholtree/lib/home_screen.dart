@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dati.dart';
 import 'professore_screen.dart';
+import 'theme.dart';
 
 /// home page con navigazione a tab: home / orario / rubrica
 class HomeScreen extends StatefulWidget {
@@ -33,6 +34,10 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('Scholtree'),
         actions: [
+          IconButton(
+            icon: Icon(isDarkMode.value ? Icons.light_mode : Icons.dark_mode),
+            onPressed: () => isDarkMode.value = !isDarkMode.value,
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'esci',
