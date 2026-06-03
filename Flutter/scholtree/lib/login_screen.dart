@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart';
 import 'dati.dart';
+import 'home_screen.dart';
 
-/// schermata di accesso con username e password
+/// schermata di login
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -11,82 +11,95 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _userCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
-  String? _errore;
+  final _user = TextEditingController();
+  final _pass = TextEditingController();
+  String? _err;
+  bool _caricamento = false;
 
   void _login() {
-    String u = _userCtrl.text.trim();
-    String p = _passCtrl.text.trim();
+    String u = _user.text.trim();
+    String p = _pass.text.trim();
 
-    if (utenti.containsKey(u) && utenti[u] == p) {
-      setState(() => _errore = null);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => HomeScreen(
-            username: u,
-            nome: infoUtenti[u]!['nome']!,
-            ruolo: infoUtenti[u]!['ruolo']!,
-            classe: infoUtenti[u]!['classe']!,
-          ),
-        ),
-      );
-    } else {
-      setState(() => _errore = 'credenziali errate');
+    if (u.isEmpty || p.isEmpty) {
+      setState(() => _err = 'inserisci username e password');
+      return;
     }
+
+    setState(() => _caricamento = true);
+
+    // simulazione attesa
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (utenti.containsKey(u) && utenti[u] == p) {
+        var info = infoUtenti[u]!;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => HomeScreen(
+              nome: info['nome']!,
+              classe: info['classe']!,
+            ),
+          ),
+        );
+      } else {
+        setState(() {
+          _err = 'credenziali errate';
+          _caricamento = false;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _user.dispose();
+    _pass.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.school, size: 80, color: Colors.indigo),
-              const SizedBox(height: 16),
-              Text('Scholtree',
-                  style: Theme.of(context).textTheme.headlineMedium),
-              const SizedBox(height: 32),
-              TextField(
-                controller: _userCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'username',
-                  prefixIcon: Icon(Icons.person),
-                  border: OutlineInputBorder(),
-                ),
+      appBar: AppBar(title: const Text('scholtree')),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.school, size: 64, color: Colors.blue),
+            const SizedBox(height: 24),
+            TextField(
+              controller: _user,
+              decoration: const InputDecoration(
+                labelText: 'username',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _passCtrl,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: 'password',
-                  prefixIcon: Icon(Icons.lock),
-                  border: OutlineInputBorder(),
-                ),
-                onSubmitted: (_) => _login(),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _pass,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'password',
+                border: OutlineInputBorder(),
               ),
-              if (_errore != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Text(_errore!,
-                      style: const TextStyle(color: Colors.red)),
-                ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _login,
-                  child: const Text('accedi'),
-                ),
+            ),
+            if (_err != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Text(_err!, style: const TextStyle(color: Colors.red)),
               ),
-            ],
-          ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: FilledButton(
+                onPressed: _caricamento ? null : _login,
+                child: _caricamento
+                    ? const CircularProgressIndicator(strokeWidth: 2)
+                    : const Text('accedi'),
+              ),
+            ),
+          ],
         ),
       ),
     );

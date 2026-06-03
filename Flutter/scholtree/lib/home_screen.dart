@@ -1,153 +1,163 @@
 import 'package:flutter/material.dart';
 import 'dati.dart';
-import 'professore_screen.dart';
-import 'theme.dart';
+import 'dettaglio.dart';
 
-/// home page con navigazione a tab: home / orario / rubrica
+/// home con orario di oggi + elenco prof
 class HomeScreen extends StatefulWidget {
-  final String username;
   final String nome;
-  final String ruolo;
   final String classe;
 
-  const HomeScreen({
-    super.key,
-    required this.username,
-    required this.nome,
-    required this.ruolo,
-    required this.classe,
-  });
+  const HomeScreen({super.key, required this.nome, required this.classe});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _tab = 0;
+  String _ricerca = '';
 
-  static const _label = ['home', 'orario', 'rubrica'];
-  static const _icon = [Icons.home, Icons.calendar_month, Icons.people];
+  // giorno della settimana in italiano
+  String _giorno(DateTime d) {
+    const giorni = {
+      1: 'lunedì', 2: 'martedì', 3: 'mercoledì',
+      4: 'giovedì', 5: 'venerdì', 6: 'sabato', 7: 'domenica'
+    };
+    return giorni[d.weekday] ?? '';
+  }
 
   @override
   Widget build(BuildContext context) {
+    DateTime oggi = DateTime.now();
+    String g = _giorno(oggi);
+    List<String> lezioni = orario[g] ?? List.filled(ore.length, '');
+    List<String> valide = lezioni.where((l) => l.isNotEmpty).toList();
+
+    // filtra prof
+    List<Map<String, String>> filtrati = prof.where((p) {
+      if (_ricerca.isEmpty) return true;
+      return p['nome']!.toLowerCase().contains(_ricerca.toLowerCase());
+    }).toList();
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Scholtree'),
-        actions: [
-          IconButton(
-            icon: Icon(isDarkMode.value ? Icons.light_mode : Icons.dark_mode),
-            onPressed: () => isDarkMode.value = !isDarkMode.value,
-          ),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'esci',
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
+        title: Text('scholtree · ${widget.classe}'),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
       ),
-      body: _tab == 0
-          ? _HomeTab(nome: widget.nome, ruolo: widget.ruolo, classe: widget.classe)
-          : _tab == 1
-              ? _OrarioTab(classe: widget.classe)
-              : _RubricaTab(),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _tab,
-        onTap: (i) => setState(() => _tab = i),
-        items: [
-          BottomNavigationBarItem(icon: Icon(_icon[0]), label: _label[0]),
-          BottomNavigationBarItem(icon: Icon(_icon[1]), label: _label[1]),
-          BottomNavigationBarItem(icon: Icon(_icon[2]), label: _label[2]),
-        ],
-      ),
-    );
-  }
-}
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── benvenuto ──
+            Text('ciao ${widget.nome}',
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
 
-// ---------- tab home ----------
+            // ── oggi ──
+            Text(g, style: const TextStyle(fontSize: 18, color: Colors.blue)),
+            Text('${oggi.day}/${oggi.month}/${oggi.year}',
+                style: const TextStyle(color: Colors.grey)),
+            const SizedBox(height: 12),
 
-class _HomeTab extends StatelessWidget {
-  final String nome;
-  final String ruolo;
-  final String classe;
-  const _HomeTab(
-      {required this.nome, required this.ruolo, required this.classe});
+            // ── lezioni ──
+            if (valide.isNotEmpty) ...[
+              const Text('lezioni oggi:',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    children: [
+                      for (int i = 0; i < lezioni.length; i++)
+                        if (lezioni[i].isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 50,
+                                  padding: const EdgeInsets.all(4),
+                                  color: Colors.blue.shade50,
+                                  child: Text(ore[i],
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                          fontSize: 12, fontWeight: FontWeight.bold)),
+                                ),
+                                const SizedBox(width: 12),
+                                Text(lezioni[i],
+                                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                              ],
+                            ),
+                          ),
+                    ],
+                  ),
+                ),
+              ),
+            ] else ...[
+              const Card(
+                child: Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Text('nessuna lezione oggi!'),
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
 
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircleAvatar(radius: 40, child: Icon(Icons.person, size: 40)),
-          const SizedBox(height: 12),
-          Text(nome, style: Theme.of(context).textTheme.titleLarge),
-          Text('$ruolo — classe $classe'),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------- tab orario ----------
-
-class _OrarioTab extends StatelessWidget {
-  final String classe;
-  const _OrarioTab({required this.classe});
-
-  @override
-  Widget build(BuildContext context) {
-    // orario hardcoded per classe 4C
-    if (classe != '4C') {
-      return const Center(child: Text('orario non ancora disponibile'));
-    }
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(8),
-        child: DataTable(
-          columns: [
-            const DataColumn(label: Text('ora')),
-            ...orario4C.keys.map((g) => DataColumn(label: Text(g))),
+            // ── professori ──
+            const Text('professori:',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            TextField(
+              onChanged: (v) => setState(() => _ricerca = v),
+              decoration: const InputDecoration(
+                hintText: 'cerca prof...',
+                prefixIcon: Icon(Icons.search),
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text('${filtrati.length} prof',
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 4),
+            if (filtrati.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: Text('nessun risultato'),
+              )
+            else
+              Column(
+                children: [
+                  for (var p in filtrati)
+                    Card(
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.blue.shade100,
+                          child: Text(_iniziali(p['nome']!),
+                              style: const TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                        title: Text(p['nome']!),
+                        subtitle: Text(p['mat'] ?? ''),
+                        onTap: () => Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => DettaglioProf(p: p),
+                        )),
+                      ),
+                    ),
+                ],
+              ),
           ],
-          rows: List.generate(ore.length, (i) {
-            return DataRow(cells: [
-              DataCell(Text(ore[i])),
-              ...orario4C.keys.map((g) => DataCell(Text(orario4C[g]![i]))),
-            ]);
-          }),
         ),
       ),
     );
   }
-}
 
-// ---------- tab rubrica ----------
-
-class _RubricaTab extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(8),
-      itemCount: rubrica.length,
-      itemBuilder: (_, i) {
-        var p = rubrica[i];
-        return Card(
-          child: ListTile(
-            leading: const CircleAvatar(child: Icon(Icons.person)),
-            title: Text(p['nome']!),
-            subtitle: Text('${p['materia']} — ${p['email']}'),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ProfessoreScreen(docente: p),
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
+  String _iniziali(String n) {
+    var parole = n.split(' ');
+    var ris = '';
+    for (var i = 0; i < parole.length && ris.length < 2; i++) {
+      if (parole[i].isNotEmpty) ris += parole[i][0];
+    }
+    return ris;
   }
 }
