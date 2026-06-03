@@ -1,36 +1,21 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express from 'express';
 import cors from 'cors';
-import { PORT } from './config';
-
-import healthRouter from './routes/health';
-import timetableRouter from './routes/timetable';
-import directoryRouter from './routes/directory';
-import authRouter from './routes/auth';
-import ldapRouter from './routes/ldap';
-import adminRouter from './routes/admin';
+import { authRouter } from './routes/auth';
+import { timetableRouter } from './routes/timetable';
 
 const app = express();
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 
-app.use('/api', healthRouter);
-app.use('/api/timetable', timetableRouter);
-app.use('/api', directoryRouter);
 app.use('/api/auth', authRouter);
-app.use('/api/ldap', ldapRouter);
-app.use('/api/admin', adminRouter);
+app.use('/api/timetable', timetableRouter);
 
-app.use((req: Request, res: Response) => {
-  res.status(404).json({ error: 'not found' });
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok', mock: true });
 });
 
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error(err);
-  res.status(500).json({ error: 'internal server error' });
+app.listen(PORT, () => {
+  console.log(`scholtree backend → http://localhost:${PORT}`);
 });
-
-app.listen(PORT, () => console.log(`scholtree backend on :${PORT}`));
-
-export default app;

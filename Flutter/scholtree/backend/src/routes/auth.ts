@@ -1,107 +1,96 @@
-import { Router, Request, Response, NextFunction } from 'express';
-import rateLimit from 'express-rate-limit';
+import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import bcrypt from 'bcryptjs';
-import db from '../db';
-import { authenticate } from '../middleware/authenticate';
-import { JWT_SECRET, JWT_EXPIRES_IN } from '../config';
-import { bindUser } from '../services/ldap.service';
-import { isLdapReachable } from '../services/health';
 
-const router = Router();
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-scholtree-2026-demo-only';
+const JWT_EXPIRES_IN = '8h';
 
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { error: 'too many login attempts' },
+// Mock user database — in real app this is SQLite + LDAP
+const MOCK_USERS: Record<string, { id: number; ldap_uid: string; name: string; role: string; department?: string; class_name?: string; email?: string }> = {
+  sfornari14: {
+    id: 1,
+    ldap_uid: 'sFORNARI14',
+    name: 'Giordano Fornari',
+    role: 'student',
+    class_name: '4C2',
+    email: 'sgiordano.fornari@itis.pr.it',
+  },
+  dollari: {
+    id: 2,
+    ldap_uid: 'dollari',
+    name: 'Paolo Ollari',
+    role: 'teacher',
+    department: 'Informatica',
+    email: 'paolo.ollari@itis.pr.it',
+  },
+  admin: {
+    id: 3,
+    ldap_uid: 'admin',
+    name: 'Amministratore',
+    role: 'admin',
+    email: 'admin@itis.pr.it',
+  },
+};
+
+export const authRouter = Router();
+
+authRouter.post('/login', (req: Request, res: Response) => {
+  const { username, password } = req.body as { username?: string; password?: string };
+
+  if (!username || !password) {
+    res.status(400).json({ error: 'username e password richiesti' });
+    return;
+  }
+
+  const user = MOCK_USERS[username.toLowerCase()];
+  if (!user) {
+    res.status(401).json({ error: 'credenziali non valide' });
+    return;
+  }
+
+  const token = jwt.sign(
+    { sub: user.id, role: user.role, ldap_uid: user.ldap_uid },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN },
+  );
+
+  res.json({
+    token,
+    user: {
+      id: user.id,
+      ldap_uid: user.ldap_uid,
+      name: user.name,
+      role: user.role,
+      department: user.department ?? null,
+      class_name: user.class_name ?? null,
+      email: user.email ?? null,
+    },
+  });
 });
 
-router.post('/login', loginLimiter, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+authRouter.get('/me', (req: Request, res: Response) => {
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'token mancante' });
+    return;
+  }
+
   try {
-    const { username, password } = req.body;
-    if (!username || !password || username.length > 256 || password.length > 512) {
-      res.status(400).json({ error: 'username and password required' });
-      return;
-    }
-
-    // Try ldap_uid match first (AD users), then admin-local (null ldap_uid, matched by name)
-    let user = await db('users').where({ ldap_uid: username, school_year: '2025-26' }).first();
+    const payload = jwt.verify(header.slice(7), JWT_SECRET) as { ldap_uid: string };
+    const user = MOCK_USERS[payload.ldap_uid.toLowerCase()];
     if (!user) {
-      user = await db('users')
-        .whereNull('ldap_uid')
-        .where({ name: username, role: 'admin', school_year: '2025-26' })
-        .first();
-    }
-
-    if (!user) {
-      res.status(401).json({ error: 'invalid credentials' });
+      res.status(401).json({ error: 'utente non trovato' });
       return;
     }
-
-    if (user.active === 0) {
-      res.status(423).json({ error: 'account disabled' });
-      return;
-    }
-
-    let ldapUsed = false;
-
-    if (!user.ldap_uid) {
-      const ok = await bcrypt.compare(password, user.password_hash);
-      if (!ok) {
-        res.status(401).json({ error: 'invalid credentials' });
-        return;
-      }
-    } else {
-      const ldapOk = await isLdapReachable();
-      if (ldapOk) {
-        const bound = await bindUser(username, password);
-        if (!bound) {
-          res.status(401).json({ error: 'invalid credentials' });
-          return;
-        }
-        ldapUsed = true;
-      } else if (user.password_hash) {
-        const ok = await bcrypt.compare(password, user.password_hash);
-        if (!ok) {
-          res.status(401).json({ error: 'invalid credentials' });
-          return;
-        }
-      } else {
-        res.status(503).json({ error: 'authentication service unavailable' });
-        return;
-      }
-    }
-
-    if (ldapUsed) {
-      await db('users').where({ id: user.id }).update({ password_hash: await bcrypt.hash(password, 10) });
-    }
-
-    const token = jwt.sign(
-      { sub: user.id, role: user.role, ldap_uid: user.ldap_uid },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN as any }
-    );
-
-    res.json({ token, user: { id: user.id, name: user.name, role: user.role, class_name: user.class_name } });
-  } catch (err) {
-    next(err);
+    res.json({
+      id: user.id,
+      ldap_uid: user.ldap_uid,
+      name: user.name,
+      role: user.role,
+      department: user.department ?? null,
+      class_name: user.class_name ?? null,
+      email: user.email ?? null,
+    });
+  } catch {
+    res.status(401).json({ error: 'token non valido' });
   }
 });
-
-router.get('/me', authenticate, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const user = await db('users')
-      .where({ id: req.user!.id, active: 1 })
-      .select('id', 'ldap_uid', 'name', 'role', 'department', 'class_name', 'email', 'teacher_resource_code')
-      .first();
-    if (!user) {
-      res.status(404).json({ error: 'user not found' });
-      return;
-    }
-    res.json(user);
-  } catch (err) {
-    next(err);
-  }
-});
-
-export default router;
